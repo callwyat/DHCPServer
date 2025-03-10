@@ -105,7 +105,12 @@ namespace GitHub.JPMikkers.DHCP
             _socket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, 1);
             _socket.SendBufferSize = 65536;
             _socket.ReceiveBufferSize = 65536;
-            if(!_IPv6) _socket.DontFragment = dontFragment;
+
+            if(!_IPv6) 
+            {
+                _socket.DontFragment = dontFragment;
+            }
+
             if(ttl >= 0)
             {
                 _socket.Ttl = ttl;

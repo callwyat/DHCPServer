@@ -5,7 +5,8 @@
     <RootNamespace>GitHub.JPMikkers.DHCP</RootNamespace>
     <AssemblyName>DHCPLibrary</AssemblyName>
     <TargetFramework>netstandard2.0</TargetFramework>
-    <Nullable>disable</Nullable>
+    <LangVersion>12</LangVersion>
+    <Nullable>enable</Nullable>
 	<FileUpgradeFlags />
     <UpgradeBackupLocation />
     <PublishUrl>publish\</PublishUrl>
@@ -55,4 +56,7 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.</Description>
     <DebugType>pdbonly</DebugType>
     <Deterministic>False</Deterministic>
   </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Logging" Version="9.0.2" />
+  </ItemGroup>
 </Project>

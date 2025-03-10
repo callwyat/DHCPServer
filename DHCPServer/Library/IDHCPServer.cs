@@ -14,8 +14,9 @@ namespace GitHub.JPMikkers.DHCP
 
     public class DHCPStopEventArgs : EventArgs
     {
-        private Exception m_Reason;
-        public Exception Reason { get { return m_Reason; } set { m_Reason = value; } }
+        public Exception? Reason { get; set; }
+
+        public new static DHCPStopEventArgs Empty { get; } = new();
     }
 
     public enum OptionMode
@@ -38,14 +39,14 @@ namespace GitHub.JPMikkers.DHCP
 
     public class ReservationItem
     {
-        private static readonly Regex s_regex = new Regex(@"^(?<mac>([0-9a-fA-F][0-9a-fA-F][:\-\.]?)+)(?<netmask>/[0-9]+)?", RegexOptions.Compiled | RegexOptions.ExplicitCapture);
+        private static readonly Regex _regex = new(@"^(?<mac>([0-9a-fA-F][0-9a-fA-F][:\-\.]?)+)(?<netmask>/[0-9]+)?", RegexOptions.Compiled | RegexOptions.ExplicitCapture);
         private string _macTaste;
         private byte[] _prefix;
-        private int _prefixBits;
+        private UInt32 _prefixBits;
 
         public string MacTaste
         {
-            get { return _macTaste; }
+            get => _macTaste;
 
             set
             {
@@ -57,15 +58,15 @@ namespace GitHub.JPMikkers.DHCP
                 {
                     try
                     {
-                        Match match = s_regex.Match(_macTaste);
+                        Match match = _regex.Match(_macTaste);
                         if(match.Success && match.Groups["mac"].Success)
                         {
                             _prefix = Utils.HexStringToBytes(match.Groups["mac"].Value);
-                            _prefixBits = _prefix.Length * 8;
+                            _prefixBits = (uint)_prefix.Length * 8;
 
                             if(match.Groups["netmask"].Success)
                             {
-                                _prefixBits = Int32.Parse(match.Groups["netmask"].Value.Substring(1));
+                                _prefixBits = UInt32.Parse(match.Groups["netmask"].Value.Substring(1));
                             }
                         }
                     }
@@ -81,28 +82,42 @@ namespace GitHub.JPMikkers.DHCP
         public IPAddress PoolEnd { get; set; }
         public bool Preempt { get; set; }
 
-        private static bool MacMatch(byte[] mac, byte[] prefix, int bits)
+        private static bool MacMatch(byte[] mac, byte[] prefix, uint bits)
         {
             // prefix should have more bits than masklength
-            if(((bits + 7) >> 3) > prefix.Length) return false;
+            if(((bits + 7) >> 3) > prefix.Length) 
+            {
+                return false;
+            }
+
             // prefix should be shorter or equal to mac address
-            if(prefix.Length > mac.Length) return false;
+            if(prefix.Length > mac.Length) 
+            {
+                return false;
+            }
+
             for(int t = 0; t < (bits - 7); t += 8)
             {
-                if(mac[t >> 3] != prefix[t >> 3]) return false;
+                if(mac[t >> 3] != prefix[t >> 3]) 
+                {
+                    return false;
+                }
             }
 
             if((bits & 7) > 0)
             {
-                byte bitMask = (byte)(0xFF00 >> (bits & 7));
-                if((mac[bits >> 3] & bitMask) != (prefix[bits >> 3] & bitMask)) return false;
+                byte bitMask = (byte)(0xFF00 >> ((int)bits & 7));
+                if((mac[bits >> 3] & bitMask) != (prefix[bits >> 3] & bitMask)) 
+                {
+                    return false;
+                }
             }
             return true;
         }
 
         public bool Match(DHCPMessage message)
         {
-            var client = DHCPClient.CreateFromMessage(message);
+            DHCPClient client = DHCPClient.CreateFromMessage(message);
 
             if(!string.IsNullOrWhiteSpace(MacTaste) && _prefix != null)
             {
@@ -122,25 +137,79 @@ namespace GitHub.JPMikkers.DHCP
         }
     }
 
+    /// <summary>
+    /// The interface of a DHCPServer
+    /// </summary>
     public interface IDHCPServer : IDisposable
     {
-        event EventHandler<DHCPTraceEventArgs> OnTrace;
+        /// <summary>
+        /// Event that is raised when the status of the server changed
+        /// </summary>
         event EventHandler<DHCPStopEventArgs> OnStatusChange;
 
+        /// <summary>
+        /// The address to host the DHCP Server from
+        /// </summary>
         IPEndPoint EndPoint { get; set; }
+
+        /// <summary>
+        /// The "SubnetMask" to assign to any requesting clients
+        /// </summary>
         IPAddress SubnetMask { get; set; }
+
+        /// <summary>
+        /// The first address available to assign to a requesting client
+        /// </summary>
         IPAddress PoolStart { get; set; }
+
+        /// <summary>
+        /// The last address available to assign a requesting client
+        /// </summary>
         IPAddress PoolEnd { get; set; }
 
+        /// <summary>
+        /// How long the client has to accept the request
+        /// </summary>
         TimeSpan OfferExpirationTime { get; set; }
+
+        /// <summary>
+        /// How long the client can use the address for
+        /// </summary>
         TimeSpan LeaseTime { get; set; }
-        IList<DHCPClient> Clients { get; }
+
+        /// <summary>
+        /// A list of all clients the server has served
+        /// </summary>
+        IReadOnlyList<DHCPClient> Clients { get; }
+
+        /// <summary>
+        /// The name of the host of the server
+        /// </summary>
         string HostName { get; }
+
+        /// <summary>
+        /// A boolean indicating if the server is active or not
+        /// </summary>
         bool Active { get; }
+
+        /// <summary>
+        /// A collection of all the options the server can provide
+        /// </summary>
         List<OptionItem> Options { get; set; }
+
+        /// <summary>
+        /// Clients that should always get the same information
+        /// </summary>
         List<ReservationItem> Reservations { get; set; }
 
+        /// <summary>
+        /// Starts the DHCP Server
+        /// </summary>
         void Start();
+
+        /// <summary>
+        /// Stops the DHCP Server
+        /// </summary>
         void Stop();
     }
 }
