@@ -43,104 +43,33 @@ namespace GitHub.JPMikkers.DHCP
             Asynchronous_Transmission_Mode3 = 21,
         };
 
-        private TOpcode _opcode;
-        private THardwareType _hardwareType;
-        private byte _hops;
-        private uint _xID;
-        private ushort _secs;
-        private bool _broadCast;
-        private IPAddress _clientIPAddress;
-        private IPAddress _yourIPAddress;
-        private IPAddress _nextServerIPAddress;
-        private IPAddress _relayAgentIPAddress;
-        private byte[] _clientHardwareAddress;
-        private string _serverHostName;
-        private string _bootFileName;
-        private List<IDHCPOption> _options;
+        public TOpcode Opcode { get; set; }
 
-        public TOpcode Opcode
-        {
-            get { return _opcode; }
-            set { _opcode = value; }
-        }
+        public THardwareType HardwareType { get; set; }
 
-        public THardwareType HardwareType
-        {
-            get { return _hardwareType; }
-            set { _hardwareType = value; }
-        }
+        public byte Hops { get; set; }
 
-        public byte Hops
-        {
-            get { return _hops; }
-            set { _hops = value; }
-        }
+        public uint XID { get; set; }
 
-        public uint XID
-        {
-            get { return _xID; }
-            set { _xID = value; }
-        }
+        public ushort Secs { get; set; }
 
-        public ushort Secs
-        {
-            get { return _secs; }
-            set { _secs = value; }
-        }
+        public bool BroadCast { get; set; }
 
-        public bool BroadCast
-        {
-            get { return _broadCast; }
-            set { _broadCast = value; }
-        }
+        public IPAddress ClientIPAddress { get; set; }
 
-        public IPAddress ClientIPAddress
-        {
-            get { return _clientIPAddress; }
-            set { _clientIPAddress = value; }
-        }
+        public IPAddress YourIPAddress { get; set; }
 
-        public IPAddress YourIPAddress
-        {
-            get { return _yourIPAddress; }
-            set { _yourIPAddress = value; }
-        }
+        public IPAddress NextServerIPAddress { get; set; }
 
-        public IPAddress NextServerIPAddress
-        {
-            get { return _nextServerIPAddress; }
-            set { _nextServerIPAddress = value; }
-        }
+        public IPAddress RelayAgentIPAddress { get; set; }
 
-        public IPAddress RelayAgentIPAddress
-        {
-            get { return _relayAgentIPAddress; }
-            set { _relayAgentIPAddress = value; }
-        }
+        public byte[] ClientHardwareAddress { get; set; }
 
-        public byte[] ClientHardwareAddress
-        {
-            get { return _clientHardwareAddress; }
-            set { _clientHardwareAddress = value; }
-        }
+        public string ServerHostName { get; set; }
 
-        public string ServerHostName
-        {
-            get { return _serverHostName; }
-            set { _serverHostName = value; }
-        }
+        public string BootFileName { get; set; }
 
-        public string BootFileName
-        {
-            get { return _bootFileName; }
-            set { _bootFileName = value; }
-        }
-
-        public List<IDHCPOption> Options
-        {
-            get { return _options; }
-            set { _options = value; }
-        }
+        public List<IDHCPOption> Options { get; set; }
 
         /// <summary>
         /// Convenience property to easily get or set the messagetype option
@@ -164,7 +93,7 @@ namespace GitHub.JPMikkers.DHCP
                 TDHCPMessageType currentMessageType = MessageType;
                 if(currentMessageType != value)
                 {
-                    _options.Add(new DHCPOptionMessageType(value));
+                    Options.Add(new DHCPOptionMessageType(value));
                 }
             }
         }
@@ -211,20 +140,20 @@ namespace GitHub.JPMikkers.DHCP
 
         public DHCPMessage()
         {
-            _hardwareType = THardwareType.Ethernet;
-            _clientIPAddress = IPAddress.Any;
-            _yourIPAddress = IPAddress.Any;
-            _nextServerIPAddress = IPAddress.Any;
-            _relayAgentIPAddress = IPAddress.Any;
-            _clientHardwareAddress = new byte[0];
-            _serverHostName = "";
-            _bootFileName = "";
-            _options = new List<IDHCPOption>();
+            HardwareType = THardwareType.Ethernet;
+            ClientIPAddress = IPAddress.Any;
+            YourIPAddress = IPAddress.Any;
+            NextServerIPAddress = IPAddress.Any;
+            RelayAgentIPAddress = IPAddress.Any;
+            ClientHardwareAddress = [];
+            ServerHostName = "";
+            BootFileName = "";
+            Options = [];
         }
 
         public IDHCPOption GetOption(TDHCPOption optionType)
         {
-            return _options.Find(delegate (IDHCPOption v) { return v.OptionType == optionType; });
+            return Options.Find(delegate (IDHCPOption v) { return v.OptionType == optionType; });
         }
 
         public bool IsRequestedParameter(TDHCPOption optionType)
@@ -235,19 +164,19 @@ namespace GitHub.JPMikkers.DHCP
 
         private DHCPMessage(Stream s) : this()
         {
-            _opcode = (TOpcode)s.ReadByte();
-            _hardwareType = (THardwareType)s.ReadByte();
-            _clientHardwareAddress = new byte[s.ReadByte()];
-            _hops = (byte)s.ReadByte();
-            _xID = ParseHelper.ReadUInt32(s);
-            _secs = ParseHelper.ReadUInt16(s);
-            _broadCast = ((ParseHelper.ReadUInt16(s) & 0x8000) == 0x8000);
-            _clientIPAddress = ParseHelper.ReadIPAddress(s);
-            _yourIPAddress = ParseHelper.ReadIPAddress(s);
-            _nextServerIPAddress = ParseHelper.ReadIPAddress(s);
-            _relayAgentIPAddress = ParseHelper.ReadIPAddress(s);
-            s.Read(_clientHardwareAddress, 0, _clientHardwareAddress.Length);
-            for(int t = _clientHardwareAddress.Length; t < 16; t++) s.ReadByte();
+            Opcode = (TOpcode)s.ReadByte();
+            HardwareType = (THardwareType)s.ReadByte();
+            ClientHardwareAddress = new byte[s.ReadByte()];
+            Hops = (byte)s.ReadByte();
+            XID = ParseHelper.ReadUInt32(s);
+            Secs = ParseHelper.ReadUInt16(s);
+            BroadCast = ((ParseHelper.ReadUInt16(s) & 0x8000) == 0x8000);
+            ClientIPAddress = ParseHelper.ReadIPAddress(s);
+            YourIPAddress = ParseHelper.ReadIPAddress(s);
+            NextServerIPAddress = ParseHelper.ReadIPAddress(s);
+            RelayAgentIPAddress = ParseHelper.ReadIPAddress(s);
+            s.Read(ClientHardwareAddress, 0, ClientHardwareAddress.Length);
+            for(int t = ClientHardwareAddress.Length; t < 16; t++) s.ReadByte();
 
             byte[] serverHostNameBuffer = new byte[64];
             s.Read(serverHostNameBuffer, 0, serverHostNameBuffer.Length);
@@ -269,23 +198,23 @@ namespace GitHub.JPMikkers.DHCP
             switch(overload)
             {
                 default:
-                    _serverHostName = ParseHelper.ReadZString(new MemoryStream(serverHostNameBuffer));
-                    _bootFileName = ParseHelper.ReadZString(new MemoryStream(bootFileNameBuffer));
-                    _options = ReadOptions(optionsBuffer, new byte[0], new byte[0]);
+                    ServerHostName = ParseHelper.ReadZString(new MemoryStream(serverHostNameBuffer));
+                    BootFileName = ParseHelper.ReadZString(new MemoryStream(bootFileNameBuffer));
+                    Options = ReadOptions(optionsBuffer, new byte[0], new byte[0]);
                     break;
 
                 case 1:
-                    _serverHostName = ParseHelper.ReadZString(new MemoryStream(serverHostNameBuffer));
-                    _options = ReadOptions(optionsBuffer, bootFileNameBuffer, new byte[0]);
+                    ServerHostName = ParseHelper.ReadZString(new MemoryStream(serverHostNameBuffer));
+                    Options = ReadOptions(optionsBuffer, bootFileNameBuffer, new byte[0]);
                     break;
 
                 case 2:
-                    _bootFileName = ParseHelper.ReadZString(new MemoryStream(bootFileNameBuffer));
-                    _options = ReadOptions(optionsBuffer, serverHostNameBuffer, new byte[0]);
+                    BootFileName = ParseHelper.ReadZString(new MemoryStream(bootFileNameBuffer));
+                    Options = ReadOptions(optionsBuffer, serverHostNameBuffer, new byte[0]);
                     break;
 
                 case 3:
-                    _options = ReadOptions(optionsBuffer, bootFileNameBuffer, serverHostNameBuffer);
+                    Options = ReadOptions(optionsBuffer, bootFileNameBuffer, serverHostNameBuffer);
                     break;
             }
         }
@@ -404,25 +333,25 @@ namespace GitHub.JPMikkers.DHCP
 
         public void ToStream(Stream s, int minimumPacketSize)
         {
-            s.WriteByte((byte)_opcode);
-            s.WriteByte((byte)_hardwareType);
-            s.WriteByte((byte)_clientHardwareAddress.Length);
-            s.WriteByte((byte)_hops);
-            ParseHelper.WriteUInt32(s, _xID);
-            ParseHelper.WriteUInt16(s, _secs);
-            ParseHelper.WriteUInt16(s, _broadCast ? (ushort)0x8000 : (ushort)0x0);
-            ParseHelper.WriteIPAddress(s, _clientIPAddress);
-            ParseHelper.WriteIPAddress(s, _yourIPAddress);
-            ParseHelper.WriteIPAddress(s, _nextServerIPAddress);
-            ParseHelper.WriteIPAddress(s, _relayAgentIPAddress);
-            s.Write(_clientHardwareAddress, 0, _clientHardwareAddress.Length);
-            for(int t = _clientHardwareAddress.Length; t < 16; t++) s.WriteByte(0);
-            ParseHelper.WriteZString(s, _serverHostName, 64);  // BOOTP legacy
-            ParseHelper.WriteZString(s, _bootFileName, 128);   // BOOTP legacy
+            s.WriteByte((byte)Opcode);
+            s.WriteByte((byte)HardwareType);
+            s.WriteByte((byte)ClientHardwareAddress.Length);
+            s.WriteByte((byte)Hops);
+            ParseHelper.WriteUInt32(s, XID);
+            ParseHelper.WriteUInt16(s, Secs);
+            ParseHelper.WriteUInt16(s, BroadCast ? (ushort)0x8000 : (ushort)0x0);
+            ParseHelper.WriteIPAddress(s, ClientIPAddress);
+            ParseHelper.WriteIPAddress(s, YourIPAddress);
+            ParseHelper.WriteIPAddress(s, NextServerIPAddress);
+            ParseHelper.WriteIPAddress(s, RelayAgentIPAddress);
+            s.Write(ClientHardwareAddress, 0, ClientHardwareAddress.Length);
+            for(int t = ClientHardwareAddress.Length; t < 16; t++) s.WriteByte(0);
+            ParseHelper.WriteZString(s, ServerHostName, 64);  // BOOTP legacy
+            ParseHelper.WriteZString(s, BootFileName, 128);   // BOOTP legacy
             s.Write(new byte[] { 99, 130, 83, 99 }, 0, 4);  // options magic cookie
 
             // write all options except RelayAgentInformation
-            foreach(var option in _options.Where(x => x.OptionType != TDHCPOption.RelayAgentInformation))
+            foreach(var option in Options.Where(x => x.OptionType != TDHCPOption.RelayAgentInformation))
             {
                 var optionStream = new MemoryStream();
                 option.ToStream(optionStream);
@@ -458,23 +387,23 @@ namespace GitHub.JPMikkers.DHCP
 
         public override string ToString()
         {
-            StringBuilder sb = new StringBuilder();
+            StringBuilder sb = new();
 
-            sb.AppendFormat("Opcode (op)                    : {0}\r\n", _opcode);
-            sb.AppendFormat("HardwareType (htype)           : {0}\r\n", _hardwareType);
-            sb.AppendFormat("Hops                           : {0}\r\n", _hops);
-            sb.AppendFormat("XID                            : {0}\r\n", _xID);
-            sb.AppendFormat("Secs                           : {0}\r\n", _secs);
-            sb.AppendFormat("BroadCast (flags)              : {0}\r\n", _broadCast);
-            sb.AppendFormat("ClientIPAddress (ciaddr)       : {0}\r\n", _clientIPAddress);
-            sb.AppendFormat("YourIPAddress (yiaddr)         : {0}\r\n", _yourIPAddress);
-            sb.AppendFormat("NextServerIPAddress (siaddr)   : {0}\r\n", _nextServerIPAddress);
-            sb.AppendFormat("RelayAgentIPAddress (giaddr)   : {0}\r\n", _relayAgentIPAddress);
-            sb.AppendFormat("ClientHardwareAddress (chaddr) : {0}\r\n", Utils.BytesToHexString(_clientHardwareAddress, "-"));
-            sb.AppendFormat("ServerHostName (sname)         : {0}\r\n", _serverHostName);
-            sb.AppendFormat("BootFileName (file)            : {0}\r\n", _bootFileName);
+            sb.AppendFormat("Opcode (op)                    : {0}\r\n", Opcode);
+            sb.AppendFormat("HardwareType (htype)           : {0}\r\n", HardwareType);
+            sb.AppendFormat("Hops                           : {0}\r\n", Hops);
+            sb.AppendFormat("XID                            : {0}\r\n", XID);
+            sb.AppendFormat("Secs                           : {0}\r\n", Secs);
+            sb.AppendFormat("BroadCast (flags)              : {0}\r\n", BroadCast);
+            sb.AppendFormat("ClientIPAddress (ciaddr)       : {0}\r\n", ClientIPAddress);
+            sb.AppendFormat("YourIPAddress (yiaddr)         : {0}\r\n", YourIPAddress);
+            sb.AppendFormat("NextServerIPAddress (siaddr)   : {0}\r\n", NextServerIPAddress);
+            sb.AppendFormat("RelayAgentIPAddress (giaddr)   : {0}\r\n", RelayAgentIPAddress);
+            sb.AppendFormat("ClientHardwareAddress (chaddr) : {0}\r\n", Utils.BytesToHexString(ClientHardwareAddress, "-"));
+            sb.AppendFormat("ServerHostName (sname)         : {0}\r\n", ServerHostName);
+            sb.AppendFormat("BootFileName (file)            : {0}\r\n", BootFileName);
 
-            foreach(IDHCPOption option in _options)
+            foreach(IDHCPOption option in Options)
             {
                 sb.AppendFormat("Option                         : {0}\r\n", option.ToString());
             }

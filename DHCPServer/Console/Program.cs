@@ -61,6 +61,9 @@ namespace Console
 
                 // server.Options.Add(new DHCPOptionTFTPServerName(Environment.MachineName));
  
+                server.Options.Add(new OptionItem(OptionMode.Default, new DHCPOptionBootFileName("menu.ipxe")));
+                server.Options.Add(new OptionItem(OptionMode.Default, new DHCPOptionTFTPServerName("192.168.1.9")));
+
                 server.OnStatusChange += (sender, e) =>
                 {
                     if (!server.Active)
