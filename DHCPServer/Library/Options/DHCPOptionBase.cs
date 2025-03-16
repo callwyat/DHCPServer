@@ -93,6 +93,8 @@ public enum TDHCPOption
     TFTPServerName = 66,
     BootFileName = 67,
 
+    UserClassIdentifier = 77,                   // rfc3004 - Used with iPXE
+
     FullyQualifiedDomainName = 81,              // RFC4702
     RelayAgentInformation = 82,                 // RFC3046, RFC6607
 
