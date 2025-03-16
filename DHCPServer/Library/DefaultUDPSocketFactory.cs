@@ -22,15 +22,15 @@ public class DefaultUDPSocketFactory : IUDPSocketFactory
 
     public IUDPSocket Create(IPEndPoint localEndPoint, int packetSize, bool dontFragment, short ttl)
     {
-        if(RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
-        {
-            _logger.LogInformation("creating UDPSocket of type {SocketImpl}", nameof(UDPSocketLinux));
-            return new UDPSocketLinux(localEndPoint, packetSize, dontFragment, ttl);
-        }
-        else
+        if(RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
         {
             _logger.LogInformation("creating UDPSocket of type {SocketImpl}", nameof(UDPSocketWindows));
             return new UDPSocketWindows(localEndPoint, packetSize, dontFragment, ttl);
+        }
+        else
+        {
+            _logger.LogInformation("creating UDPSocket of type {SocketImpl}", nameof(UDPSocketLinux));
+            return new UDPSocketLinux(localEndPoint, packetSize, dontFragment, ttl);
         }
     }
 }

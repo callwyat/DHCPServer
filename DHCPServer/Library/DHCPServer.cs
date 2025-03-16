@@ -214,14 +214,14 @@ public class DHCPServer : IDHCPServer
                         }
                         else
                         {
-                            Trace("Could not update client information, data might be stale");
+                            _logger.LogInformation("Could not update client information, data might be stale");
                         }
                     }
                 }
             }
             catch(Exception e)
             {
-                Trace($"Exception in OnUpdateClientInfo : {e}");
+                _logger.LogError(e, $"Exception in OnUpdateClientInfo");
             }
         }
     }
@@ -259,15 +259,15 @@ public class DHCPServer : IDHCPServer
         {
             try
             {
-                Trace($"Starting DHCP server '{_endPoint}'");
+                _logger.LogDebug("Starting DHCP server '{EndPoint}'", _endPoint);
                 _active = true;
                 _socket = _udpSocketFactory.Create(_endPoint, 2048, true, 10);
                 _mainTask = Task.Run(async () => { await MainTask(_cancellationTokenSource.Token); });
-                Trace("DHCP Server start succeeded");
+                _logger.LogInformation("DHCP Server start succeeded");
             }
             catch(Exception e)
             {
-                Trace($"DHCP Server start failed, reason '{e}'");
+                _logger.LogError(e, "DHCP Server start failed");
                 _active = false;
                 throw;
             }
@@ -323,18 +323,13 @@ public class DHCPServer : IDHCPServer
         OnStatusChange(this, data);
     }
 
-    internal void Trace(string msg)
-    {
-        _logger?.LogInformation(msg);
-    }
-
     private void Stop(Exception? reason)
     {
         bool notify = false;
 
         if(_active)
         {
-            Trace($"Stopping DHCP server '{_endPoint}'");
+            _logger.LogDebug("Stopping DHCP server '{EndPoint}'", _endPoint);
             _active = false;
             notify = true;
             _cancellationTokenSource.Cancel();
@@ -347,13 +342,13 @@ public class DHCPServer : IDHCPServer
                 }
                 catch(Exception ex)
                 {
-                    _logger?.LogError(ex, $"Exception during {nameof(Stop)}");
+                    _logger.LogError(ex, $"Exception during {nameof(Stop)}");
                 }
                 _mainTask = null;
             }
 
             _socket.Dispose();
-            Trace("Stopped");
+            _logger.LogInformation("Stopped");
         }
 
         if(notify)
@@ -390,14 +385,17 @@ public class DHCPServer : IDHCPServer
     {
         if(_clients.TryRemove(client, out _))
         {
-            Trace($"Removed client '{client}' from client table");
+            _logger.LogInformation("Removed client '{Client}' from client table", client);
         }
     }
 
     private async Task SendMessage(DHCPMessage msg, IPEndPoint endPoint)
     {
-        Trace($"==== Sending response to {endPoint} ====");
-        Trace(Utils.PrefixLines(msg.ToString(), "s->c "));
+        _logger.LogDebug("==== Sending response to {EndPoint} ====", endPoint);
+        if (_logger.IsEnabled(LogLevel.Trace))
+        {
+            _logger.LogTrace(Utils.PrefixLines(msg.ToString(), "s->c "));
+        }
 
         try
         {
@@ -408,7 +406,7 @@ public class DHCPServer : IDHCPServer
         catch(Exception e)
         {
             // treat any send failures like a lost udp packet, we don't want any badly behaving DHCP clients to kill the server
-            Trace($"{nameof(SendMessage)} failed: {e.Message}");
+            _logger.LogError(e, $"{nameof(SendMessage)} failed");
         }
     }
 
@@ -696,12 +694,12 @@ public class DHCPServer : IDHCPServer
             }
             else
             {
-                Trace($"Client sent message with non-matching server identifier '{dhcpOptionServerIdentifier.IPAddress}' -> ignored");
+                _logger.LogDebug("Client sent message with non-matching server identifier '{ClientIPAddress}' -> ignored", dhcpOptionServerIdentifier.IPAddress);
             }
         }
         else
         {
-            Trace("Client sent message without filling required ServerIdentifier option -> ignored");
+            _logger.LogDebug("Client sent message without filling required ServerIdentifier option -> ignored");
         }
         return result;
     }
@@ -904,17 +902,20 @@ public class DHCPServer : IDHCPServer
     {
         try
         {
-            Trace("Incoming packet - parsing DHCP Message");
+            _logger.LogTrace("Incoming packet - parsing DHCP Message");
 
             // translate array segment into a DHCPMessage
             DHCPMessage dhcpMessage = DHCPMessage.FromStream(new MemoryStream(data.ToArray()));
-            Trace(Utils.PrefixLines(dhcpMessage.ToString(), "c->s "));
+            if (_logger.IsEnabled(LogLevel.Trace))
+            {
+                _logger.LogTrace(Utils.PrefixLines(dhcpMessage.ToString(), "c->s "));
+            }
 
             // only react to messages from client to server. Ignore other types.
             if(dhcpMessage.Opcode == DHCPMessage.TOpcode.BootRequest)
             {
                 DHCPClient client = DHCPClient.CreateFromMessage(dhcpMessage);
-                Trace($"Client {client} sent {dhcpMessage.MessageType}");
+                _logger.LogDebug("Client {Client} sent {MessageType}", client, dhcpMessage.MessageType);
                 // is it a known client?
                 DHCPClient? knownClient = GetKnownClient(client);
 
@@ -926,16 +927,16 @@ public class DHCPServer : IDHCPServer
 
                         if(knownClient != null)
                         {
-                            Trace($"Client is known, in state {knownClient.State}");
+                            _logger.LogDebug("Client is known, in state {State}", knownClient.State);
 
                             if(knownClient.State == DHCPClient.TState.Offered || knownClient.State == DHCPClient.TState.Assigned)
                             {
-                                Trace("Client sent DISCOVER but we already offered, or assigned -> repeat offer with known address");
+                                _logger.LogDebug("Client sent DISCOVER but we already offered, or assigned -> repeat offer with known address");
                                 await OfferClient(dhcpMessage, knownClient);
                             }
                             else
                             {
-                                Trace("Client is known but released");
+                                _logger.LogDebug("Client is known but released");
                                 // client is known but released or dropped. Use the old address or allocate a new one
                                 if(knownClient.IPAddress.Equals(IPAddress.Any))
                                 {
@@ -946,19 +947,19 @@ public class DHCPServer : IDHCPServer
                                     }
                                     else
                                     {
-                                        Trace("No free addresses.");
+                                        _logger.LogDebug("No free addresses.");
 
                                         // This can be a Boot Server (not DHCP), check for PXE requests.
                                         if(dhcpMessage.GetOption(TDHCPOption.VendorClassIdentifier) != null)
                                         {
-                                            Trace("Found Option [60|VendorClassIdentifier] Assmue this is a Boot Server (not DHCP).");
+                                            _logger.LogDebug("Found Option [60|VendorClassIdentifier] Assmue this is a Boot Server (not DHCP).");
                                             await SendACK(dhcpMessage, dhcpMessage.ClientIPAddress, new TimeSpan(0));
                                         }
                                         else if((dhcpMessage.GetOption(TDHCPOption.ClientMachineIdentifier) != null) &&
                                                 (dhcpMessage.GetOption(TDHCPOption.ClientNetworkInterfaceIdentifier) != null) &&
                                                 (dhcpMessage.GetOption(TDHCPOption.ClientSystemArchitectureType) != null))
                                         {
-                                            Trace("Found Option [93,94,97|RFC4578] Assume this is a Boot Server (not DHCP).");
+                                            _logger.LogDebug("Found Option [93,94,97|RFC4578] Assume this is a Boot Server (not DHCP).");
                                             await SendACK(dhcpMessage, dhcpMessage.ClientIPAddress, new TimeSpan(0));
                                         }
 
@@ -972,7 +973,7 @@ public class DHCPServer : IDHCPServer
                         }
                         else
                         {
-                            Trace("Client is not known yet");
+                            _logger.LogDebug("Client is not known yet");
                             // client is not known yet.
                             // allocate new address, add client to client table in Offered state
                             client.IPAddress = AllocateIPAddress(dhcpMessage);
@@ -983,7 +984,7 @@ public class DHCPServer : IDHCPServer
                             }
                             else
                             {
-                                Trace("No more free addresses. Don't respond to discover");
+                                _logger.LogWarning("No more free addresses. Don't respond to discover");
                             }
                         }
                         break;
@@ -1014,7 +1015,7 @@ public class DHCPServer : IDHCPServer
                                     {
                                         if(knownClient.IPAddress.Equals(dhcpOptionRequestedIPAddress.IPAddress))
                                         {
-                                            Trace("Client request matches offered address -> ACK");
+                                            _logger.LogDebug("Client request matches offered address -> ACK");
                                             knownClient.State = DHCPClient.TState.Assigned;
                                             knownClient.LeaseStartTime = DateTime.Now;
                                             knownClient.LeaseDuration = _leaseTime;
@@ -1022,14 +1023,14 @@ public class DHCPServer : IDHCPServer
                                         }
                                         else
                                         {
-                                            Trace($"Client sent request for IP address '{dhcpOptionRequestedIPAddress.IPAddress}', but it does not match the offered address '{knownClient.IPAddress}' -> NAK");
+                                            _logger.LogWarning("Client sent request for IP address '{ReceivedAddress}', but it does not match the offered address '{SentAddress}' -> NAK", dhcpOptionRequestedIPAddress.IPAddress, knownClient.IPAddress);
                                             await SendNAK(dhcpMessage);
                                             RemoveClient(knownClient);
                                         }
                                     }
                                     else
                                     {
-                                        Trace("Client sent request without filling the RequestedIPAddress option -> NAK");
+                                        _logger.LogWarning("Client sent request without filling the RequestedIPAddress option -> NAK");
                                         await SendNAK(dhcpMessage);
                                         RemoveClient(knownClient);
                                     }
@@ -1037,13 +1038,13 @@ public class DHCPServer : IDHCPServer
                                 else
                                 {
                                     // we don't have an outstanding offer!
-                                    Trace("Client requested IP address from this server, but we didn't offer any. -> NAK");
+                                    _logger.LogWarning("Client requested IP address from this server, but we didn't offer any. -> NAK");
                                     await SendNAK(dhcpMessage);
                                 }
                             }
                             else
                             {
-                                Trace($"Client requests IP address that was offered by another DHCP server at '{dhcpOptionServerIdentifier.IPAddress}' -> drop offer");
+                                _logger.LogInformation("Client requests IP address that was offered by another DHCP server at '{IPAddress}' -> drop offer", dhcpOptionServerIdentifier.IPAddress);
                                 // it's a response to another DHCP server.
                                 // if we sent an OFFER to this client earlier, remove it.
                                 if(knownClient != null)
@@ -1057,11 +1058,11 @@ public class DHCPServer : IDHCPServer
                             // no server identifier: the message is a request to verify or extend an existing lease
                             // Received REQUEST without server identifier, client is INIT-REBOOT, RENEWING or REBINDING
 
-                            Trace("Received REQUEST without server identifier, client state is INIT-REBOOT, RENEWING or REBINDING");
+                            _logger.LogWarning("Received REQUEST without server identifier, client state is INIT-REBOOT, RENEWING or REBINDING");
 
                             if(!dhcpMessage.ClientIPAddress.Equals(IPAddress.Any))
                             {
-                                Trace("REQUEST client IP is filled in -> client state is RENEWING or REBINDING");
+                                _logger.LogWarning("REQUEST client IP is filled in -> client state is RENEWING or REBINDING");
 
                                 // see : http://www.tcpipguide.com/free/t_DHCPLeaseRenewalandRebindingProcesses-2.htm
 
@@ -1092,13 +1093,13 @@ public class DHCPServer : IDHCPServer
                                     }
                                     else
                                     {
-                                        Trace("Renewing client IP address already in use. Oops..");
+                                        _logger.LogDebug("Renewing client IP address already in use. Oops..");
                                     }
                                 }
                             }
                             else
                             {
-                                Trace("REQUEST client IP is empty -> client state is INIT-REBOOT");
+                                _logger.LogInformation("REQUEST client IP is empty -> client state is INIT-REBOOT");
 
                                 if(dhcpOptionRequestedIPAddress != null)
                                 {
@@ -1107,7 +1108,7 @@ public class DHCPServer : IDHCPServer
                                     {
                                         if(knownClient.IPAddress.Equals(dhcpOptionRequestedIPAddress.IPAddress))
                                         {
-                                            Trace("Client request matches cached address -> ACK");
+                                            _logger.LogInformation("Client request matches cached address -> ACK");
                                             // known, assigned, and IP address matches administration. ACK
                                             knownClient.LeaseStartTime = DateTime.Now;
                                             knownClient.LeaseDuration = _leaseTime;
@@ -1115,7 +1116,7 @@ public class DHCPServer : IDHCPServer
                                         }
                                         else
                                         {
-                                            Trace($"Client sent request for IP address '{dhcpOptionRequestedIPAddress.IPAddress}', but it does not match cached address '{knownClient.IPAddress}' -> NAK");
+                                            _logger.LogInformation("Client sent request for IP address '{ReceivedAddress}', but it does not match cached address '{SentAddress}' -> NAK", dhcpOptionRequestedIPAddress.IPAddress, knownClient.IPAddress);
                                             await SendNAK(dhcpMessage);
                                             RemoveClient(knownClient);
                                         }
@@ -1125,14 +1126,14 @@ public class DHCPServer : IDHCPServer
                                         // client not known, or known but in some other state.
                                         // send NAK so client will drop to INIT state where it can acquire a new lease.
                                         // see also: http://tcpipguide.com/free/t_DHCPGeneralOperationandClientFiniteStateMachine.htm
-                                        Trace("Client attempted INIT-REBOOT REQUEST but server has no lease for this client -> NAK");
+                                        _logger.LogWarning("Client attempted INIT-REBOOT REQUEST but server has no lease for this client -> NAK");
                                         await SendNAK(dhcpMessage);
                                         if(knownClient != null) RemoveClient(knownClient);
                                     }
                                 }
                                 else
                                 {
-                                    Trace("Client sent apparent INIT-REBOOT REQUEST but with an empty 'RequestedIPAddress' option. Oops..");
+                                    _logger.LogInformation("Client sent apparent INIT-REBOOT REQUEST but with an empty 'RequestedIPAddress' option. Oops..");
                                 }
                             }
                         }
@@ -1148,7 +1149,7 @@ public class DHCPServer : IDHCPServer
                         {
                             if(knownClient != null)
                             {
-                                Trace("Found client in client table, removing.");
+                                _logger.LogDebug("Found client in client table, removing.");
                                 RemoveClient(client);
 
                                 /*
@@ -1166,7 +1167,7 @@ public class DHCPServer : IDHCPServer
                             }
                             else
                             {
-                                Trace("Client not found in client table -> decline ignored.");
+                                _logger.LogInformation("Client not found in client table -> decline ignored.");
                             }
                         }
                         break;
@@ -1183,19 +1184,19 @@ public class DHCPServer : IDHCPServer
                             {
                                 if(dhcpMessage.ClientIPAddress.Equals(knownClient.IPAddress))
                                 {
-                                    Trace("Found client in client table, marking as released");
+                                    _logger.LogDebug("Found client in client table, marking as released");
                                     knownClient.State = DHCPClient.TState.Released;
                                 }
                                 else
                                 {
-                                    Trace("IP address in RELEASE doesn't match known client address. Mark this client as released with unknown IP");
+                                    _logger.LogInformation("IP address in RELEASE doesn't match known client address. Mark this client as released with unknown IP");
                                     knownClient.IPAddress = IPAddress.Any;
                                     knownClient.State = DHCPClient.TState.Released;
                                 }
                             }
                             else
                             {
-                                Trace("Client not found in client table, release ignored.");
+                                _logger.LogDebug("Client not found in client table, release ignored.");
                             }
                         }
                         break;
@@ -1213,7 +1214,7 @@ public class DHCPServer : IDHCPServer
                         break;
 
                     default:
-                        Trace("Invalid message from client, ignored");
+                        _logger.LogWarning("Invalid message from client, ignored");
                         break;
                 }
 

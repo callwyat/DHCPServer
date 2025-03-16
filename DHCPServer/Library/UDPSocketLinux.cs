@@ -33,12 +33,6 @@ public class UDPSocketLinux : IUDPSocket
 
     public UDPSocketLinux(IPEndPoint localEndPoint, int maxPacketSize, bool dontFragment, short ttl)
     {
-        foreach(var nic in NetworkInterface.GetAllNetworkInterfaces())
-        {
-            Console.WriteLine($"{nic.Id}");
-
-        }
-
         var selectedNic = NetworkInterface.GetAllNetworkInterfaces()
             .Where(x => x.GetIPProperties().UnicastAddresses.Select(a => a.Address).Contains(localEndPoint.Address))
             .FirstOrDefault();
@@ -64,7 +58,7 @@ public class UDPSocketLinux : IUDPSocket
             _socket.Ttl = ttl;
         }
 
-        if(!RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+        if(RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
         {
             _socket.SetRawSocketOption(SOL_SOCKET, SO_BINDTODEVICE, Encoding.UTF8.GetBytes(selectedNic.Id));
         }

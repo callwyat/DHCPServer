@@ -5,8 +5,9 @@
     <RootNamespace>GitHub.JPMikkers.DHCP</RootNamespace>
     <AssemblyName>DHCPLibrary</AssemblyName>
     <TargetFramework>net9.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
     <Nullable>enable</Nullable>
-	  <FileUpgradeFlags />
+    <FileUpgradeFlags />
     <UpgradeBackupLocation />
     <PublishUrl>publish\</PublishUrl>
     <Install>true</Install>
