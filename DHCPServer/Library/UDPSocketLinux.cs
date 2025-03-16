@@ -18,7 +18,8 @@ public class UDPSocketLinux : IUDPSocket
 
     private bool _disposed;                                     // true => object is disposed
     private readonly bool _IPv6;                                // true => it's an IPv6 connection
-    private readonly Socket _socket;                            // The active socket
+    private readonly Socket _receiveSocket;                            // The active socket
+    private readonly Socket _sendSocket;                            // The active socket
     private readonly int _maxPacketSize;                        // size of packets we'll try to receive
 
     private readonly IPEndPoint _localEndPoint;
@@ -47,22 +48,41 @@ public class UDPSocketLinux : IUDPSocket
 
         _IPv6 = (localEndPoint.AddressFamily == AddressFamily.InterNetworkV6);
 
-        _socket = new Socket(localEndPoint.AddressFamily, SocketType.Dgram, ProtocolType.Udp);
-        _socket.EnableBroadcast = true;
-        _socket.ExclusiveAddressUse = false;    //_socket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, 1);
-        _socket.SendBufferSize = 65536;
-        _socket.ReceiveBufferSize = 65536;
-        if(!_IPv6) _socket.DontFragment = dontFragment;
+        _receiveSocket = new Socket(localEndPoint.AddressFamily, SocketType.Dgram, ProtocolType.Udp);
+        _receiveSocket.EnableBroadcast = true;
+        _receiveSocket.ExclusiveAddressUse = false;    //_socket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, 1);
+        _receiveSocket.SendBufferSize = 65536;
+        _receiveSocket.ReceiveBufferSize = 65536;
+        if(!_IPv6) _receiveSocket.DontFragment = dontFragment;
         if(ttl >= 0)
         {
-            _socket.Ttl = ttl;
+            _receiveSocket.Ttl = ttl;
         }
 
         if(RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
         {
-            _socket.SetRawSocketOption(SOL_SOCKET, SO_BINDTODEVICE, Encoding.UTF8.GetBytes(selectedNic.Id));
+            _receiveSocket.SetRawSocketOption(SOL_SOCKET, SO_BINDTODEVICE, Encoding.UTF8.GetBytes(selectedNic.Id));
         }
-        _socket.Bind(new IPEndPoint(IPAddress.Any, localEndPoint.Port));
+        _receiveSocket.Bind(new IPEndPoint(IPAddress.Any, localEndPoint.Port));
+
+        // Pretty much the same setup again
+        _sendSocket = new Socket(localEndPoint.AddressFamily, SocketType.Dgram, ProtocolType.Udp);
+        _sendSocket.EnableBroadcast = true;
+        _sendSocket.ExclusiveAddressUse = false;    //_socket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, 1);
+        _sendSocket.SendBufferSize = 65536;
+        _sendSocket.ReceiveBufferSize = 65536;
+        if(!_IPv6) _sendSocket.DontFragment = dontFragment;
+        if(ttl >= 0)
+        {
+            _sendSocket.Ttl = ttl;
+        }
+
+        if(RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
+        {
+            _sendSocket.SetRawSocketOption(SOL_SOCKET, SO_BINDTODEVICE, Encoding.UTF8.GetBytes(selectedNic.Id));
+        }
+        _sendSocket.Bind(new IPEndPoint(localEndPoint.Address, localEndPoint.Port));
+
         _localEndPoint = localEndPoint;
     }
 
@@ -72,7 +92,7 @@ public class UDPSocketLinux : IUDPSocket
         try
         {
             var mem = new Memory<byte>(new byte[_maxPacketSize]);
-            var result = await _socket.ReceiveFromAsync(mem, new IPEndPoint(IPAddress.Any, 0), cancellationToken);
+            var result = await _receiveSocket.ReceiveFromAsync(mem, new IPEndPoint(IPAddress.Any, 0), cancellationToken);
 
             if(result.RemoteEndPoint is IPEndPoint endpoint)
             {
@@ -115,7 +135,7 @@ public class UDPSocketLinux : IUDPSocket
     {
         try
         {
-            await _socket.SendToAsync(msg, endPoint, cancellationToken);
+            await _sendSocket.SendToAsync(msg, endPoint, cancellationToken);
         }
         catch(OperationCanceledException)
         {
@@ -158,8 +178,11 @@ public class UDPSocketLinux : IUDPSocket
 
                 try
                 {
-                    _socket.Shutdown(SocketShutdown.Both);
-                    _socket.Close();
+                    _receiveSocket.Shutdown(SocketShutdown.Both);
+                    _receiveSocket.Close();
+
+                    _sendSocket.Shutdown(SocketShutdown.Both);
+                    _sendSocket.Close();
                 }
                 catch(Exception)
                 {
